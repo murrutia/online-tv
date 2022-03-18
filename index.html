@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta name="theme-color" content="black">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="referrer" content="no-referrer">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>m3u8 TV</title>
+    <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/level-selector@latest/dist/level-selector.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clappr-chromecast-plugin@latest/dist/clappr-chromecast-plugin.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clappr-pip@latest/dist/clappr-pip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dash-shaka-playback@latest/dist/dash-shaka-playback.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clappr-playback-rate-plugin@latest/dist/clappr-playback-rate-plugin.min.js"></script>
+    <style>
+        html,
+        body,
+        #player {
+            position: relative;
+            top: 0;
+            left: 0;
+            /* obligatoire pour que le lecteur n'ait pas une hauteur de 0 quand on le configure à height: 100% */
+            height: 100%;
+            width: 100%;
+            transition: left 0.5s ease-in-out;
+        }
+        
+        body {
+            background-color: #000;
+            margin: 0;
+        }
+        
+        #drawer {
+            position: fixed;
+            top: 0;
+            left: -200px;
+            width: 200px;
+            height: 100%;
+            padding: 0;
+            color: white;
+            background-color: #222;
+            transition: left 0.5s ease-in-out;
+        }
+        
+        body:hover #player {
+            left: 200px;
+            width: calc(100% - 200px)
+        }
+        
+        body:hover #drawer {
+            left: 0;
+        }
+        
+        #drawer ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        #drawer ul ul {
+            padding-left: 20px;
+        }
+        
+        #drawer h3 {
+            font: normal 16px Arial;
+            padding: 10px;
+            margin: 0;
+            background-color: #111;
+        }
+        
+        #drawer li a {
+            text-decoration: none;
+            font-family: Arial;
+            color: white;
+            transition: all 0.3s ease-in-out;
+            display: inline-block;
+            padding: 3px;
+        }
+        
+        #drawer>ul>li>a {
+            padding-left: 10px;
+        }
+        
+        #drawer li a:hover {
+            color: orange;
+        }
+        
+        #drawer li a.active {
+            color: orange;
+        }
+    </style>
+    <script>
+        const channels = {
+            "Perú": {
+                "ATV": "https://d2tr4gdfol9ja.cloudfront.net/atv/atv.smil/.m3u8",
+                "ATV+": "https://d2tr4gdfol9ja.cloudfront.net/atv/atv-mas.smil/.m3u8",
+                "BHTV": "https://5c3fb01839654.streamlock.net:1963/iptvbhtv/livebhtvtv/.m3u8",
+                "TV Cosmos": "https://edge1o.live.opencaster.com/caster/tpHaqFjazqvD.m3u8",
+                "Exitosa": "https://cu.onliv3.com/livevd1/user2.m3u8",
+                "BETHEL": "https://streannlive-lh.akamaihd.net/i/betheltelevision_1@352148/master.m3u8?customtoken=9f47d4d0-cd96-4ccb-8751-bf2b7c83d907&hdnts=exp=1647266067~acl=*~hmac=bb01b699c8cbcf7b6cb2dbb0780d6ea3ab6a32b89718d8117b8b0c80415f7a7d&AkamaiAnalytics_debug=1&set-segment-duration=smoothest&dw=3600&resellerId=5e00e27f2cdcb4fdbcd783c8",
+            },
+            "France": {
+                "BFMTV": "https://bfmtvalive1-a.akamaihd.net/f3c53617100e4fd7a0fbdf9e784a650e/eu-central-1/876450610001/7b4151e1e2434a7cacdb9936db7a7910/playlist_ssaiM.m3u8",
+                "TV5 Monde Info": "https://ott.tv5monde.com/Content/HLS/Live/channel(info)/variant.m3u8",
+                "TV5 Monde": "https://ott.tv5monde.com/Content/HLS/Live/channel(fbs)/variant.m3u8",
+                "France Info": "https://photocall.tv/b6rk/l1?ch=france_info",
+                "France 2": "https://simulcast.ftven.fr/ZXhwPTE2NDcyODgwMzJ+YWNsPSUyZip+aG1hYz1lZWFjZjg2ZmNjMjhiNTE1NTIzYzc2ZDMwZGM5NjlkY2E3ZGRmZWEzYjA5YmM5ZmFhOWQ1MzcwNmNhZjlkMjUw/simulcast/France_2/hls_fr2/index.m3u8?hdnea=exp=1647267032~acl=%2f*~hmac=b31abfb3d32787c06ec8d6258bcade5caf7c7c98e9718e8268aa43fa5392c8bc",
+                "France 3": "https://simulcast.ftven.fr/ZXhwPTE2NDcyODgwOTN+YWNsPSUyZip+aG1hYz0zZGI2ZmVhMTIzMzAzNDJmOWY1YjJlM2EyOTc2OThjYTNkN2NmMmUyMjljMzAzZDRmMmE4ZTY2MGFmNjk2MGM3/simulcast/France_3/hls_fr3/index.m3u8?hdnea=exp=1647267093~acl=%2f*~hmac=f77a3089cb8910ce8a0b21a76c4faca607c290e096d2558867826f2465c66d94",
+                "France 4": "https://simulcast.ftven.fr/ZXhwPTE2NDcyODgxNTh+YWNsPSUyZip+aG1hYz04MWQ4Y2M0ZTZiMjU0OGM5MTcwMDkyNGJlODc3OWYxODA0NGU4MzhhNDkyZTMyNDExOGMzN2M3YTExZmZiYmJj/simulcast/France_4/hls_fr4/index.m3u8?hdnea=exp=1647267158~acl=%2f*~hmac=a39aa4ba9b9ae4ee3e42a0638279ce4e2e1886f8401036aae79d7fe3bfcbea47",
+                "France 5": "https://simulcast.ftven.fr/ZXhwPTE2NDcyODgyMTB+YWNsPSUyZip+aG1hYz1kNmVkM2VkNDliMzdlMTUyYzMxNzgwOTg0MmVlNmJjNmZmZWE4ZDQ2Yjg0MGY1ZGRlOGMxM2JkYWE5OWIzZGEx/simulcast/France_5/hls_fr5/index.m3u8?hdnea=exp=1647267210~acl=%2f*~hmac=ee103dd5be7f8788147e67afc244aecba08318a0df8f5dc797f8d536562aa2e6",
+                "Tébéo (TV Bretagne Ouest)": "https://edge-live-ger1.ovstream.com/hls/11/index.m3u8?token=live_11_c46d25ba2fa698fafd1e05e0f502d59e",
+                "La chaîne normande": "https://lcn.live-kd.com/live/lcn/ngrp:lcn_Wifi/.m3u8",
+                "Francophonie 24": "https://5421175365ea3.streamlock.net/live/switch.smil/.m3u8",
+                "Alsace 20": "https://alsace20.live-kd.com/live/alsace20/ngrp:alsace20_all/.m3u8",
+                "Wéo Nord": "https://live.digiteka.com/1/WGQ1NnhEN0lzM0NU/dk1EOHhw/hls/live/playlist.m3u8",
+                "Wéo Picardie": "https://live.digiteka.com/1/Zks2L0VsM2V0T242/QTBqcFly/hls/live/playlist.m3u8",
+                "Vià ATV": "https://streamer01.myvideoplace.tv/streamer02/hls/ATV_DIRECT_EV_111018.m3u8",
+                "Vià Occitanie": "https://streamer01.myvideoplace.tv/streamer02/hls/MDS_VIA_PAD_301117.m3u8",
+                "Vià Matélé": "https://streamer01.myvideoplace.tv/streamer02/hls/MATL_VLOC_PAD_100919.m3u8",
+                "Vià Moselle": "https://live.creacast.com/mirabelletv/mirabelletv.smil/.m3u8",
+                "Vosges TV": "https://viavosges.live-kd.com/live/vosgestv/livestream/.m3u8",
+                "Gulli": "https://d13anarbtxy8c5.cloudfront.net/6play/short/clr/gulli/sdindex.m3u8",
+                "Sport en France": "https://sportenfrance.ziostream.cloud/hls/sp1564435593.m3u8",
+                "Rakuten TV": "https://rakuten-actionmovies-7-fr.samsung.wurl.tv/playlist.m3u8",
+            },
+            "International": {
+                "Redbull TV": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+                "Wipeout": "https://d2stx9idyk58lb.cloudfront.net/wipeoutxtra-samsungus/playlist.m3u8",
+            }
+
+        }
+    </script>
+</head>
+
+<body>
+    <div id="player">
+    </div>
+    <div id="drawer">
+        <ul></ul>
+    </div>
+    <script>
+        function create_link(title, href) {
+            const a = document.createElement('a');
+            a.textContent = title;
+            a.setAttribute('href', href);
+            return a;
+        }
+
+        const menu = document.querySelector('#drawer ul');
+        for (const c in channels) {
+            const li = document.createElement('li');
+            const item = channels[c];
+
+            if (typeof(item) == 'string') {
+                li.appendChild(create_link(c, item));
+            } else {
+                const h = document.createElement('h3');
+                h.textContent = c;
+
+                const ul = document.createElement('ul');
+                for (const cc in item) {
+                    const lli = document.createElement('li');
+                    lli.appendChild(create_link(cc, item[cc]));
+                    ul.appendChild(lli);
+                }
+                console.log('hello')
+                console.log(li)
+                li.appendChild(h);
+                li.appendChild(ul);
+            }
+            menu.append(li);
+        }
+
+        document.querySelectorAll('#drawer a')
+            .forEach(elt => {
+                elt.addEventListener('click', evt => {
+                    console.log(elt)
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    if (!elt.classList.contains('active')) {
+                        document.querySelectorAll('#drawer a').forEach(a => a.classList.remove('active'));
+                        elt.classList.add('active');
+                        // player = document.querySelector('.player')
+                        // player = window.player
+                        // console.log(player)
+                        player.configure({
+                            source: elt.href
+                        })
+                    }
+                })
+            })
+
+        if (p2pml.hlsjs.Engine.isSupported()) {
+            var engine = new p2pml.hlsjs.Engine();
+            var str = "https://d2tr4gdfol9ja.cloudfront.net/atv/atv.smil/.m3u8";
+            var player = new Clappr.Player({
+                parentId: "#player",
+                mimeType: "application/x-mpegURL",
+                source: str,
+                plugins: [LevelSelector, ChromecastPlugin, ClapprPip.PipButton, ClapprPip.PipPlugin, DashShakaPlayback, Clappr.MediaControl, PlaybackRatePlugin],
+                events: {
+                    onReady: function() {
+                        var plugin = this.getPlugin("click_to_pause");
+                        plugin && plugin.disable();
+                    },
+                },
+                width: "100%",
+                height: "100%",
+                autoPlay: true,
+                // mute: true,
+                playbackRateConfig: {
+                    defaultValue: "1.00x",
+                    options: [{
+                        value: "0.10",
+                        label: "0.10x"
+                    }, {
+                        value: "0.25",
+                        label: "0.25x"
+                    }, {
+                        value: "0.50",
+                        label: "0.50x"
+                    }, {
+                        value: "0.75",
+                        label: "0.75x"
+                    }, {
+                        value: "1.00",
+                        label: "1.00x"
+                    }, {
+                        value: "1.25",
+                        label: "1.25x"
+                    }, {
+                        value: "1.50",
+                        label: "1.50x"
+                    }, {
+                        value: "1.75",
+                        label: "1.75x"
+                    }, {
+                        value: "2.00",
+                        label: "2.00x"
+                    }, ]
+                },
+                playback: {
+                    hlsjsConfig: {
+                        liveSyncDurationCount: 7,
+                        loader: engine.createLoaderClass()
+                    }
+                }
+            });
+            p2pml.hlsjs.initClapprPlayer(player);
+        } else {
+            document.write("Not supported :(");
+        }
+    </script>
+</body>
+
+</html>
